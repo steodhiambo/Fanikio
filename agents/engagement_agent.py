@@ -10,10 +10,23 @@ from openai import OpenAI
 from config import OPENAI_API_KEY, OPENAI_MODEL, X_BEARER_TOKEN, X_HASHTAGS
 from database.db import execute_query
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+# Mock mode check
+MOCK_MODE = not X_BEARER_TOKEN or "your_" in X_BEARER_TOKEN or not OPENAI_API_KEY or "your_" in OPENAI_API_KEY
+
+if not MOCK_MODE:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    client = None
+    print("Engagement Agent running in MOCK MODE.")
 
 
 def fetch_top_posts(max_per_hashtag=3) -> list[dict]:
+    if MOCK_MODE:
+        return [
+            {"text": "Data engineering is all about pipelines.", "url": "https://x.com/mock/1", "author": "DE_Guru"},
+            {"text": "Why dbt is the real deal.", "url": "https://x.com/mock/2", "author": "dbt_fan"},
+        ]
+    
     x_client = tweepy.Client(bearer_token=X_BEARER_TOKEN)
     posts = []
 
@@ -48,6 +61,9 @@ def fetch_top_posts(max_per_hashtag=3) -> list[dict]:
 
 
 def generate_comment(post_text: str) -> str:
+    if MOCK_MODE:
+        return f"Interesting point about '{post_text[:30]}...'. Have you considered how this impacts latency in real-time pipelines?"
+
     prompt = f"""
 You are helping an aspiring data engineer engage meaningfully on X.
 

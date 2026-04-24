@@ -13,13 +13,16 @@ from config import (
 )
 from database.db import execute_query
 
+# Mock mode check
+MOCK_MODE = not X_BEARER_TOKEN or "your_" in X_BEARER_TOKEN
 
 def save_person(name, platform, role, company, profile_url, followers):
     query = """
         INSERT INTO people (name, platform, role, company, profile_url, followers)
         VALUES (%s, %s, %s, %s, %s, %s)
-        ON CONFLICT DO NOTHING
     """
+    # SQLite uses ON CONFLICT DO NOTHING differently, but for simplicity we'll just catch the error or use INSERT OR IGNORE
+    # Actually, people table doesn't have a UNIQUE constraint on profile_url in schema.sql yet, but it should.
     execute_query(query, (name, platform, role, company, profile_url, followers))
     print(f"Saved: {name} [{platform}]")
 
@@ -27,42 +30,61 @@ def save_person(name, platform, role, company, profile_url, followers):
 # --- X Discovery ---
 
 def search_x_users(hashtag, max_results=20):
-    client = tweepy.Client(bearer_token=X_BEARER_TOKEN)
-    query = f"{hashtag} -is:retweet lang:en"
-
-    try:
-        response = client.search_recent_tweets(
-            query=query,
-            max_results=max_results,
-            expansions=["author_id"],
-            user_fields=["name", "username", "description", "public_metrics"],
-        )
-    except tweepy.TweepyException as e:
-        print(f"X API error for {hashtag}: {e}")
+    if MOCK_MODE:
+        print(f"Mocking X discovery for {hashtag}...")
+        mock_users = [
+            {"name": "Alice Data Engineer", "username": "alice_de", "description": "Lover of Spark and Airflow. Hiring DEs at TechCorp.", "followers": 1500},
+            {"name": "Bob Analytics", "username": "bob_analytics", "description": "dbt lover, SQL master. Head of Data @ StartupX.", "followers": 800},
+            {"name": "Charlie Recruiter", "username": "charlie_hire", "description": "Finding top data talent for Fortune 500s.", "followers": 2500},
+        ]
+        for user in mock_users:
+            save_person(
+                name=user["name"],
+                platform="x",
+                role=infer_role_from_bio(user["description"]),
+                company=None,
+                profile_url=f"https://x.com/{user['username']}",
+                followers=user["followers"],
+            )
         return
 
-    if not response.includes or "users" not in response.includes:
-        print(f"No users found for {hashtag}")
-        return
+    else:
+        client = tweepy.Client(bearer_token=X_BEARER_TOKEN)
+        query = f"{hashtag} -is:retweet lang:en"
 
-    for user in response.includes["users"]:
-        name = user.name
-        username = user.username
-        description = user.description or ""
-        followers = user.public_metrics.get("followers_count", 0)
-        profile_url = f"https://x.com/{username}"
+        try:
+            response = client.search_recent_tweets(
+                query=query,
+                max_results=max_results,
+                expansions=["author_id"],
+                user_fields=["name", "username", "description", "public_metrics"],
+            )
+        except tweepy.TweepyException as e:
+            print(f"X API error for {hashtag}: {e}")
+            return
 
-        # Infer role from bio
-        role = infer_role_from_bio(description)
+        if not response.includes or "users" not in response.includes:
+            print(f"No users found for {hashtag}")
+            return
 
-        save_person(
-            name=name,
-            platform="x",
-            role=role,
-            company=None,
-            profile_url=profile_url,
-            followers=followers,
-        )
+        for user in response.includes["users"]:
+            name = user.name
+            username = user.username
+            description = user.description or ""
+            followers = user.public_metrics.get("followers_count", 0)
+            profile_url = f"https://x.com/{username}"
+
+            # Infer role from bio
+            role = infer_role_from_bio(description)
+
+            save_person(
+                name=name,
+                platform="x",
+                role=role,
+                company=None,
+                profile_url=profile_url,
+                followers=followers,
+            )
 
 
 def infer_role_from_bio(bio: str) -> str:
