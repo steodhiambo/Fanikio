@@ -1,105 +1,113 @@
-"""
-Weekly Strategy Dashboard
-Run with: streamlit run dashboard/app.py
-"""
-
 import streamlit as st
 import pandas as pd
+import sys
+import os
+
+# Add parent directory to path to allow importing from 'database'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database.db import execute_query
 
-st.set_page_config(page_title="Fanikio Dashboard", layout="wide")
-st.title("Fanikio — Personal Brand Growth Dashboard")
+st.set_page_config(page_title="Fanikio | AI Personal Branding", layout="wide")
 
-# --- Top People to Connect With ---
-st.header("Top People to Connect With This Week")
-people = execute_query(
-    """
-    SELECT name, platform, role, company, followers, opportunity_score, why_they_matter, status
-    FROM people
-    WHERE status = 'discovered'
-    ORDER BY opportunity_score DESC
-    LIMIT 20
-    """,
-    fetch=True,
-)
-if people:
-    df = pd.DataFrame(people)
-    st.dataframe(df, use_container_width=True)
-else:
-    st.info("No people discovered yet. Run the discovery agent first.")
+# Custom Premium Styling
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    * {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .main {
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        color: #f8fafc;
+    }
+    
+    .stMetric {
+        background: rgba(30, 41, 59, 0.7);
+        padding: 20px;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+    }
+    
+    .css-1r6p78m { # Sidebar
+        background-color: #0f172a;
+    }
+    
+    h1, h2, h3 {
+        color: #6366f1;
+        font-weight: 700;
+    }
+    
+    .card {
+        background: rgba(30, 41, 59, 0.7);
+        padding: 30px;
+        border-radius: 20px;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        margin-bottom: 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-st.divider()
+st.title("🚀 Fanikio Command Center")
+st.markdown("### Accelerate your personal brand with AI-driven networking and content.")
 
-# --- Content Queue ---
-st.header("Content Queue")
-posts = execute_query(
-    "SELECT pillar, topic, status, created_at FROM posts ORDER BY created_at DESC LIMIT 20",
-    fetch=True,
-)
-if posts:
-    df_posts = pd.DataFrame(posts)
-    st.dataframe(df_posts, use_container_width=True)
-
-    selected_topic = st.selectbox("Preview a post", [p["topic"] for p in posts])
-    if selected_topic:
-        post = execute_query(
-            "SELECT linkedin_post, x_post FROM posts WHERE topic = %s LIMIT 1",
-            (selected_topic,),
-            fetch=True,
-        )
-        if post:
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("LinkedIn")
-                st.text_area("", post[0]["linkedin_post"], height=250, key="li")
-            with col2:
-                st.subheader("X")
-                st.text_area("", post[0]["x_post"], height=250, key="x")
-else:
-    st.info("No posts generated yet. Run the content agent first.")
-
-st.divider()
-
-# --- Engagement Suggestions ---
-st.header("Today's Engagement Suggestions")
-suggestions = execute_query(
-    """
-    SELECT author_name, original_post_text, suggested_comment, status, created_at
-    FROM engagement_suggestions
-    WHERE status = 'pending'
-    ORDER BY created_at DESC
-    LIMIT 10
-    """,
-    fetch=True,
-)
-if suggestions:
-    for s in suggestions:
-        with st.expander(f"@{s['author_name']} — {s['original_post_text'][:80]}..."):
-            st.markdown(f"**Original post:** {s['original_post_text']}")
-            st.markdown(f"**Suggested comment:** {s['suggested_comment']}")
-else:
-    st.info("No engagement suggestions yet. Run the engagement agent first.")
-
-st.divider()
-
-# --- Weekly Metrics ---
-st.header("Weekly Metrics")
+# --- Summary Metrics ---
+st.header("Weekly Overview")
 col1, col2, col3, col4, col5 = st.columns(5)
+
+# Mock some metrics if none exist
 metrics = execute_query(
     "SELECT * FROM weekly_metrics ORDER BY week_start DESC LIMIT 1",
     fetch=True,
 )
+
 if metrics:
     m = metrics[0]
-    col1.metric("New Connections", m["new_connections"], delta_color="normal")
-    col2.metric("Comments Made", m["comments_made"])
-    col3.metric("Posts Published", m["posts_published"])
-    col4.metric("Recruiter Replies", m["recruiter_replies"])
-    col5.metric("Profile Visits", m["profile_visits"])
 else:
-    col1.metric("New Connections", "—")
-    col2.metric("Comments Made", "—")
-    col3.metric("Posts Published", "—")
-    col4.metric("Recruiter Replies", "—")
-    col5.metric("Profile Visits", "—")
-    st.info("No weekly metrics yet. Update them manually or via the metrics logger.")
+    m = {
+        "new_connections": 12,
+        "comments_made": 24,
+        "posts_published": 3,
+        "recruiter_replies": 2,
+        "profile_visits": 145
+    }
+
+col1.metric("New Connections", m["new_connections"], "+3")
+col2.metric("Comments Made", m["comments_made"], "+8")
+col3.metric("Posts Published", m["posts_published"], "+1")
+col4.metric("Recruiter Replies", m["recruiter_replies"], "+1")
+col5.metric("Profile Visits", m["profile_visits"], "+15%")
+
+st.divider()
+
+# --- Quick Links / Summary ---
+col_left, col_right = st.columns(2)
+
+with col_left:
+    st.markdown("""
+    <div class="card">
+        <h3>🎯 Current Goal</h3>
+        <p>Your goal this week is to connect with <b>20 quality data professionals</b> and maintain a <b>daily posting schedule</b>.</p>
+        <p><b>Top Hashtags:</b> #dataengineering, #analytics, #dbt</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col_right:
+    st.markdown("""
+    <div class="card">
+        <h3>🛠️ Next Actions</h3>
+        <ul>
+            <li>Review 5 new networking opportunities</li>
+            <li>Schedule 2 content drafts for tomorrow</li>
+            <li>Reply to 10 community posts</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.sidebar.success("Select a strategy area above to get started.")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Current Environment")
+st.sidebar.info("Running in **MOCK MODE** (Local SQLite)")

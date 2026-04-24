@@ -9,7 +9,14 @@ from openai import OpenAI
 from config import OPENAI_API_KEY, OPENAI_MODEL
 from database.db import execute_query
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+# Mock mode check
+MOCK_MODE = not OPENAI_API_KEY or "your_" in OPENAI_API_KEY
+
+if not MOCK_MODE:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    client = None
+    print("Content Agent running in MOCK MODE.")
 
 PILLAR_PROMPTS = {
     "what_i_learned": "Share a genuine lesson learned while working with {topic}. Start with what you got wrong, then what you discovered.",
@@ -35,19 +42,14 @@ Rules:
 
 
 def generate_post(pillar: str, topic: str) -> dict:
+    if MOCK_MODE:
+        return {
+            "linkedin": f"MOCK LINKEDIN POST: {pillar} about {topic}\n\nLearning {topic} has been a game changer for my data engineering journey. #dataengineering #learning",
+            "x": f"MOCK X POST: Just learned about {topic}. Here is why it matters for DEs... #dataengineering"
+        }
+
     user_prompt = f"""
-{PILLAR_PROMPTS[pillar].format(topic=topic)}
-
-Generate:
-1. A LinkedIn post (150-250 words)
-2. An X thread version (under 280 characters, punchy)
-
-Format your response exactly like this:
-LINKEDIN:
-[post here]
-
-X:
-[post here]
+...
 """
     response = client.chat.completions.create(
         model=OPENAI_MODEL,
